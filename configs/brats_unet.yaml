@@ -1,0 +1,9 @@
+dataset: BraTs
+dataset_dir: ./BraTs/processed/
+
+model: unet3d
+
+batch_size: 1
+epochs: 100
+optimizer: sgd
+optimizer_args: {lr: 0.001, weight_decay: 5.e-4, scheduler: step}
