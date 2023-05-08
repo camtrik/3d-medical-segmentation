@@ -101,14 +101,37 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def dice_coef(pred, target, smooth=1e-5):
+# def dice_coef(pred, target, smooth=1e-5):
+#     num = pred.size(0)
+#     pred = pred.view(num, -1)
+#     target = target.view(num, -1)
+#     intersection = (pred * target).sum(1)
+#     dice = (2. * intersection + smooth) / (pred.sum(1) + target.sum(1) + smooth)
+#     return (dice.sum() / num).item()
 
-    num = pred.size(0)
-    pred = pred.view(num, -1)
-    target = target.view(num, -1)
-    intersection = (pred * target).sum(1)
-    dice = (2. * intersection + smooth) / (pred.sum(1) + target.sum(1) + smooth)
-    return dice.sum() / num
+def dice_coef(pred, target, smooth=1e-5):
+    # pred sigmoid
+    pred = torch.sigmoid(pred)
+    iflat = pred.contiguous().view(-1)
+    tflat = target.contiguous().view(-1)
+    intersection = (iflat * tflat).sum()
+
+    A_sum = torch.sum(tflat * iflat)
+    B_sum = torch.sum(tflat * tflat)
+    dice = (2. * intersection + smooth) / (A_sum + B_sum + smooth)
+    return dice.item()
+
+# def dice_coef(pred, target, smooth=1e-5):
+#     # 将 tensor 移动到 CPU 设备并分离梯度图
+#     pred = pred.detach().cpu()
+#     target = target.detach().cpu()
+
+#     num = pred.size(0)
+#     pred = pred.view(num, -1)
+#     target = target.view(num, -1)
+#     intersection = (pred * target).sum(1)
+#     dice = (2. * intersection + smooth) / (pred.sum(1) + target.sum(1) + smooth)
+#     return dice.sum() / num
 
 
 import torch
