@@ -49,15 +49,14 @@ def main(config):
     print("type of train mask: ", type(train_dataset[0][1]))
     # model
     model = models.UNet3D(in_channels=4, out_channels=3).cuda()
+    # args = None
+    # model = models.UNet3D(args).cuda()
 
     optimizer, lr_scheduler = utils.make_optimizer(model.parameters(), config['optimizer'], **config['optimizer_args'])
-    criterion = utils.BCEDiceLoss()
+    criterion = utils.DiceLoss()
     # train
     log_keys = ['train_loss', 'train_dice', 'val_loss', 'val_dice']
-    # train_loss = utils.AverageMeter()
-    # val_loss = utils.AverageMeter()
-    # train_dice = utils.AverageMeter()
-    # val_dice = utils.AverageMeter()
+
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
 
@@ -65,14 +64,11 @@ def main(config):
         aves = {key: utils.AverageMeter() for key in log_keys}
         model.train()
         for i, (inputs, targets) in tqdm(enumerate(train_loader), total=len(train_loader)):
-            # inputs, targets = inputs.cuda(), targets.cuda()
-            inputs_copy, targets_copy = copy.deepcopy(inputs), copy.deepcopy(targets)
-            inputs_copy, targets_copy = inputs_copy.cuda(), targets_copy.cuda()
-            
-            outputs = model(inputs_copy)
-    
-            loss = criterion(outputs, targets_copy)
-            dice = utils.dice_coef(outputs, targets_copy)
+            inputs, targets = inputs.cuda(), targets.cuda()
+            outputs = model(inputs)
+
+            loss = criterion(outputs, targets)
+            dice = utils.dice_coef(outputs, targets)
             
             optimizer.zero_grad()
             loss.backward()
@@ -80,15 +76,8 @@ def main(config):
             
             aves['train_loss'].update(loss.item(), inputs.size(0))
             aves['train_dice'].update(dice, inputs.size(0))
-            
-            # delete copys
-            del inputs_copy, targets_copy
-            del outputs, loss, dice
-            torch.cuda.empty_cache()
-            gc.collect()
-            
 
-            if (i % 10 == 0):
+            if (i % 20 == 0):
                 utils.log('epoch: {}, train_loss: {:.4f}, train_dice: {:.4f}'.format(
                     epoch, aves['train_loss'].avg, aves['train_dice'].avg))
                 wandb.log({'train_loss': aves['train_loss'].avg, 'train_dice': aves['train_dice'].avg})
@@ -96,26 +85,14 @@ def main(config):
         model.eval()
         with torch.no_grad():
             for inputs, targets in tqdm(val_loader):
-                inputs_copy, targets_copy = copy.deepcopy(inputs), copy.deepcopy(targets)
-                inputs_copy, targets_copy = inputs_copy.cuda(), targets_copy.cuda()
-                
-                outputs = model(inputs_copy)
-        
-                loss = criterion(outputs, targets_copy)
-                dice = utils.dice_coef(outputs, targets_copy)
-                # inputs, targets = inputs.cuda(), targets.cuda()
-                # outputs = model(inputs)
+                inputs, targets = inputs.cuda(), targets.cuda()
+                outputs = model(inputs)
 
-                # loss = criterion(outputs, targets)
-                # dice = utils.dice_coef(outputs, targets)
+                loss = criterion(outputs, targets)
+                dice = utils.dice_coef(outputs, targets)
+
                 aves['val_loss'].update(loss.item(), inputs.size(0))
                 aves['val_dice'].update(dice, inputs.size(0))
-
-                del inputs_copy, targets_copy
-                del outputs, loss, dice
-                torch.cuda.empty_cache()
-                gc.collect()
-                
 
         if lr_scheduler is not None:
             lr_scheduler.step()
